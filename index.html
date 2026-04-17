@@ -6,163 +6,82 @@
     <title>Ultimate Tris Online</title>
     <script src="https://unpkg.com/playroomkit/dist/playroomkit.js"></script>
     <style>
-        :root {
-            --bg: #1a1a1a;
-            --cell-bg: #2a2a2a;
-            --text: #ffffff;
-            --x-color: #ff4757;
-            --o-color: #2e97ff;
-            --active-bg: rgba(46, 204, 113, 0.2);
-        }
-
-        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); text-align: center; margin: 0; padding: 20px; }
-        .status { font-size: 1.2rem; margin: 20px 0; padding: 10px; background: #333; border-radius: 5px; display: inline-block; }
-        
-        .main-board {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 15px;
-            width: max-content;
-            margin: 0 auto;
-            padding: 15px;
-            background: #333;
-            border-radius: 8px;
-        }
-
-        .local-board {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 5px;
-            padding: 8px;
-            background: #444;
-            border-radius: 4px;
-            position: relative;
-        }
-
-        .active-board { background: var(--active-bg); box-shadow: 0 0 15px rgba(46, 204, 113, 0.5); }
-
-        .cell {
-            width: 45px;
-            height: 45px;
-            background: var(--cell-bg);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.5rem;
-            font-weight: bold;
-            cursor: pointer;
-        }
-
-        .cell.X { color: var(--x-color); }
-        .cell.O { color: var(--o-color); }
-
-        .local-board.won-X::after, .local-board.won-O::after {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 4rem; background: rgba(26, 26, 26, 0.8); z-index: 10;
-        }
-        .local-board.won-X::after { content: 'X'; color: var(--x-color); }
-        .local-board.won-O::after { content: 'O'; color: var(--o-color); }
+        body { font-family: sans-serif; background: #1a1a1a; color: white; text-align: center; padding: 20px; }
+        .main-board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: max-content; margin: 20px auto; background: #333; padding: 10px; border-radius: 8px; }
+        .local-board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; padding: 5px; background: #444; border-radius: 4px; position: relative; }
+        .cell { width: 40px; height: 40px; background: #2a2a2a; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; cursor: pointer; }
+        .active-board { background: rgba(46, 204, 113, 0.3); }
+        .won-X::after { content: 'X'; color: #ff4757; position: absolute; font-size: 3rem; top:0; left:0; width:100%; height:100%; display:flex; align-items:center; justify-content:center; background: rgba(0,0,0,0.6); }
+        .won-O::after { content: 'O'; color: #2e97ff; position: absolute; font-size: 3rem; top:0; left:0; width:100%; height:100%; display:flex; align-items:center; justify-content:center; background: rgba(0,0,0,0.6); }
     </style>
 </head>
 <body>
-
-    <h1>Ultimate Tris Multiplayer</h1>
-    
-    <div id="status" class="status">Inizializzazione gioco...</div>
-
+    <h1>Ultimate Tris Online</h1>
+    <div id="status">Caricamento Multiplayer...</div>
     <div id="board" class="main-board"></div>
 
     <script>
-        const { insertCoin, myPlayer, onPlayerJoin, setState, getState, onStorageUpdate } = Playroom;
-
-        async function start() {
-            // Avvia la lobby di Playroom (qui si crea il codice per l'amico)
-            await insertCoin({
-                gameId: "ultimate-tris-pro-gionls2026", // Cambia questo ID se vuoi una stanza diversa
-                discord: false
-            });
-
-            // Se sei il primo (Host), pulisci la scacchiera
-            if (Playroom.isHost()) {
-                setState("bigBoard", Array(9).fill(null));
-                setState("smallBoards", Array(9).fill(null).map(() => Array(9).fill(null)));
-                setState("activeBoard", null);
-                setState("turn", "X");
+        // Verifichiamo se Playroom è caricato correttamente
+        window.onload = async () => {
+            try {
+                await Playroom.insertCoin({ gameId: "tris-test-univoque-999" });
+                setupGame();
+            } catch (e) {
+                document.getElementById('status').innerText = "Errore: " + e.message;
             }
+        };
 
-            // Assegna il simbolo (X al primo, O al secondo)
-            const players = Playroom.getPlayers();
-            const symbol = players.indexOf(myPlayer()) === 0 ? "X" : "O";
-            myPlayer().setState("symbol", symbol);
-
-            // Ogni volta che qualcuno muove, ridisegna la scacchiera
-            onStorageUpdate(render);
+        function setupGame() {
+            if (Playroom.isHost()) {
+                Playroom.setState("bigBoard", Array(9).fill(null));
+                Playroom.setState("smallBoards", Array(9).fill(null).map(() => Array(9).fill(null)));
+                Playroom.setState("turn", "X");
+                Playroom.setState("activeBoard", null);
+            }
+            Playroom.onStorageUpdate(render);
             render();
         }
 
         function render() {
-            const turn = getState("turn") || "X";
-            const mySymbol = myPlayer().getState("symbol");
-            const statusDiv = document.getElementById('status');
+            const bigBoard = Playroom.getState("bigBoard") || Array(9).fill(null);
+            const smallBoards = Playroom.getState("smallBoards") || Array(9).fill(null).map(() => Array(9).fill(null));
+            const turn = Playroom.getState("turn");
+            const activeBoard = Playroom.getState("activeBoard");
             
-            statusDiv.innerHTML = `Sei: <b style="color:${mySymbol === 'X' ? 'var(--x-color)' : 'var(--o-color)'}">${mySymbol}</b> | Turno di: <b>${turn}</b>`;
-            if (turn !== mySymbol) statusDiv.style.opacity = "0.5";
-            else statusDiv.style.opacity = "1";
-
+            document.getElementById('status').innerText = "Tocca a: " + turn;
             const container = document.getElementById('board');
             container.innerHTML = '';
-
-            const bigBoard = getState("bigBoard") || Array(9).fill(null);
-            const smallBoards = getState("smallBoards") || Array(9).fill(null).map(() => Array(9).fill(null));
-            const activeBoard = getState("activeBoard");
 
             for (let i = 0; i < 9; i++) {
                 const bDiv = document.createElement('div');
                 bDiv.className = 'local-board';
                 if (bigBoard[i]) bDiv.classList.add('won-' + bigBoard[i]);
-                
-                // Evidenzia quadrante attivo
-                if (activeBoard === i || (activeBoard === null && !bigBoard[i])) {
-                    bDiv.classList.add('active-board');
-                }
+                if (activeBoard === i || (activeBoard === null && !bigBoard[i])) bDiv.classList.add('active-board');
 
                 for (let j = 0; j < 9; j++) {
                     const cDiv = document.createElement('div');
-                    cDiv.className = 'cell ' + (smallBoards[i][j] || '');
+                    cDiv.className = 'cell';
                     cDiv.innerText = smallBoards[i][j] || '';
-                    
-                    // Permetti il click solo se è il tuo turno e il quadrante è giusto
-                    if (!smallBoards[i][j] && !bigBoard[i] && (activeBoard === i || activeBoard === null) && turn === mySymbol) {
-                        cDiv.onclick = () => handleMove(i, j);
+                    if (!smallBoards[i][j] && !bigBoard[i] && (activeBoard === i || activeBoard === null)) {
+                        cDiv.onclick = () => {
+                            smallBoards[i][j] = turn;
+                            // Controllo veloce vincita quadrante
+                            const lines = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+                            if (lines.some(l => smallBoards[i][l[0]] && smallBoards[i][l[0]] === smallBoards[i][l[1]] && smallBoards[i][l[0]] === smallBoards[i][l[2]])) {
+                                bigBoard[i] = turn;
+                            }
+                            Playroom.setState("smallBoards", smallBoards);
+                            Playroom.setState("bigBoard", bigBoard);
+                            Playroom.setState("activeBoard", bigBoard[j] ? null : j);
+                            Playroom.setState("turn", turn === "X" ? "O" : "X");
+                        };
                     }
                     bDiv.appendChild(cDiv);
                 }
                 container.appendChild(bDiv);
             }
         }
-
-        function handleMove(bIdx, cIdx) {
-            const turn = getState("turn");
-            let sBoards = getState("smallBoards");
-            let bBoard = getState("bigBoard");
-
-            sBoards[bIdx][cIdx] = turn;
-
-            // Controllo vittoria quadrante
-            const lines = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
-            if (lines.some(l => sBoards[bIdx][l[0]] && sBoards[bIdx][l[0]] === sBoards[bIdx][l[1]] && sBoards[bIdx][l[0]] === sBoards[bIdx][l[2]])) {
-                bBoard[bIdx] = turn;
-            }
-
-            // Aggiorna stato globale Playroom
-            setState("smallBoards", sBoards);
-            setState("bigBoard", bBoard);
-            setState("activeBoard", bBoard[cIdx] ? null : cIdx);
-            setState("turn", turn === "X" ? "O" : "X");
-        }
-
-        start();
     </script>
 </body>
 </html>
+
