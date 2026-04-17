@@ -4,53 +4,124 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ultimate Tris Online</title>
-    <script src="https://unpkg.com/playroomkit/dist/playroomkit.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/playroomkit/dist/playroomkit.js"></script>
     <style>
-        body { font-family: sans-serif; background: #1a1a1a; color: white; text-align: center; padding: 20px; }
-        .main-board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: max-content; margin: 20px auto; background: #333; padding: 10px; border-radius: 8px; }
-        .local-board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; padding: 5px; background: #444; border-radius: 4px; position: relative; }
-        .cell { width: 40px; height: 40px; background: #2a2a2a; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; cursor: pointer; }
-        .active-board { background: rgba(46, 204, 113, 0.3); }
-        .won-X::after { content: 'X'; color: #ff4757; position: absolute; font-size: 3rem; top:0; left:0; width:100%; height:100%; display:flex; align-items:center; justify-content:center; background: rgba(0,0,0,0.6); }
-        .won-O::after { content: 'O'; color: #2e97ff; position: absolute; font-size: 3rem; top:0; left:0; width:100%; height:100%; display:flex; align-items:center; justify-content:center; background: rgba(0,0,0,0.6); }
+        :root {
+            --bg: #1a1a1a;
+            --cell-bg: #2a2a2a;
+            --text: #ffffff;
+            --x-color: #ff4757;
+            --o-color: #2e97ff;
+            --active-bg: rgba(46, 204, 113, 0.2);
+        }
+
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); text-align: center; margin: 0; padding: 20px; }
+        .status { font-size: 1.1rem; margin: 15px 0; padding: 10px; background: #333; border-radius: 5px; display: inline-block; min-width: 200px; }
+        
+        .main-board {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            width: max-content;
+            margin: 0 auto;
+            padding: 12px;
+            background: #333;
+            border-radius: 8px;
+        }
+
+        .local-board {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 4px;
+            padding: 6px;
+            background: #444;
+            border-radius: 4px;
+            position: relative;
+        }
+
+        .active-board { background: var(--active-bg); box-shadow: 0 0 10px rgba(46, 204, 113, 0.4); }
+
+        .cell {
+            width: 42px;
+            height: 42px;
+            background: var(--cell-bg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3rem;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .cell.X { color: var(--x-color); }
+        .cell.O { color: var(--o-color); }
+
+        .local-board.won-X::after, .local-board.won-O::after {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 3.5rem; background: rgba(26, 26, 26, 0.85); z-index: 5;
+            border-radius: 4px;
+        }
+        .local-board.won-X::after { content: 'X'; color: var(--x-color); }
+        .local-board.won-O::after { content: 'O'; color: var(--o-color); }
     </style>
 </head>
 <body>
-    <h1>Ultimate Tris Online</h1>
-    <div id="status">Caricamento Multiplayer...</div>
+
+    <h1>Ultimate Tris Multiplayer</h1>
+    <div id="status" class="status">Verifica connessione...</div>
     <div id="board" class="main-board"></div>
 
     <script>
-        // Verifichiamo se Playroom è caricato correttamente
-        window.onload = async () => {
+        // Funzione per controllare che la libreria sia caricata prima di iniziare
+        function checkAndStart() {
+            if (typeof Playroom !== 'undefined') {
+                initGame();
+            } else {
+                document.getElementById('status').innerText = "Download moduli in corso...";
+                setTimeout(checkAndStart, 1000);
+            }
+        }
+
+        async function initGame() {
             try {
-                await Playroom.insertCoin({ gameId: "tris-test-univoque-999" });
-                setupGame();
+                // Inserisci un Game ID unico per la tua stanza
+                await Playroom.insertCoin({ 
+                    gameId: "tris-estremo-gioloschi-unique-2026",
+                    discord: false 
+                });
+
+                if (Playroom.isHost()) {
+                    Playroom.setState("bigBoard", Array(9).fill(null));
+                    Playroom.setState("smallBoards", Array(9).fill(null).map(() => Array(9).fill(null)));
+                    Playroom.setState("activeBoard", null);
+                    Playroom.setState("turn", "X");
+                }
+
+                const players = Playroom.getPlayers();
+                const mySymbol = players.indexOf(Playroom.myPlayer()) === 0 ? "X" : "O";
+                Playroom.myPlayer().setState("symbol", mySymbol);
+
+                Playroom.onStorageUpdate(render);
+                render();
             } catch (e) {
                 document.getElementById('status').innerText = "Errore: " + e.message;
             }
-        };
-
-        function setupGame() {
-            if (Playroom.isHost()) {
-                Playroom.setState("bigBoard", Array(9).fill(null));
-                Playroom.setState("smallBoards", Array(9).fill(null).map(() => Array(9).fill(null)));
-                Playroom.setState("turn", "X");
-                Playroom.setState("activeBoard", null);
-            }
-            Playroom.onStorageUpdate(render);
-            render();
         }
 
         function render() {
-            const bigBoard = Playroom.getState("bigBoard") || Array(9).fill(null);
-            const smallBoards = Playroom.getState("smallBoards") || Array(9).fill(null).map(() => Array(9).fill(null));
-            const turn = Playroom.getState("turn");
-            const activeBoard = Playroom.getState("activeBoard");
+            const turn = Playroom.getState("turn") || "X";
+            const mySymbol = Playroom.myPlayer().getState("symbol");
+            const statusDiv = document.getElementById('status');
             
-            document.getElementById('status').innerText = "Tocca a: " + turn;
+            statusDiv.innerHTML = `Sei: <b style="color:${mySymbol === 'X' ? 'var(--x-color)' : 'var(--o-color)'}">${mySymbol}</b> | Turno: <b>${turn}</b>`;
+            
             const container = document.getElementById('board');
             container.innerHTML = '';
+
+            const bigBoard = Playroom.getState("bigBoard") || Array(9).fill(null);
+            const smallBoards = Playroom.getState("smallBoards") || Array(9).fill(null).map(() => Array(9).fill(null));
+            const activeBoard = Playroom.getState("activeBoard");
 
             for (let i = 0; i < 9; i++) {
                 const bDiv = document.createElement('div');
@@ -60,12 +131,12 @@
 
                 for (let j = 0; j < 9; j++) {
                     const cDiv = document.createElement('div');
-                    cDiv.className = 'cell';
+                    cDiv.className = 'cell ' + (smallBoards[i][j] || '');
                     cDiv.innerText = smallBoards[i][j] || '';
-                    if (!smallBoards[i][j] && !bigBoard[i] && (activeBoard === i || activeBoard === null)) {
+                    
+                    if (!smallBoards[i][j] && !bigBoard[i] && (activeBoard === i || activeBoard === null) && turn === mySymbol) {
                         cDiv.onclick = () => {
                             smallBoards[i][j] = turn;
-                            // Controllo veloce vincita quadrante
                             const lines = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
                             if (lines.some(l => smallBoards[i][l[0]] && smallBoards[i][l[0]] === smallBoards[i][l[1]] && smallBoards[i][l[0]] === smallBoards[i][l[2]])) {
                                 bigBoard[i] = turn;
@@ -81,7 +152,9 @@
                 container.appendChild(bDiv);
             }
         }
+
+        // Avvio procedura
+        window.onload = checkAndStart;
     </script>
 </body>
 </html>
-
